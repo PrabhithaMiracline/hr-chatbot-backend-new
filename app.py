@@ -3,8 +3,9 @@ from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 import chromadb
 from chromadb.config import Settings
-from langchain.chroma import Chroma
+from langchain.vectorstores import Chroma
 from langchain.embeddings import HuggingFaceEmbeddings
+
 import google.generativeai as genai
 from datetime import datetime
 
