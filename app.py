@@ -8,22 +8,22 @@ from langchain.embeddings import HuggingFaceEmbeddings
 import google.generativeai as genai
 from datetime import datetime
 
-# Initialize Flask app
+# --- Initialize Flask app ---
 app = Flask(__name__)
 CORS(app)
 
-# Secret key for session handling
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "your_default_secret_key")
+# Secret key for session handling (required for session management)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecretkey123")
 
-# Load environment variables
-GENAI_API_KEY = os.getenv("GENAI_API_KEY")
+# Load environment variable for Gemini API
+GENAI_API_KEY = os.getenv("API_KEY")
 if not GENAI_API_KEY:
-    raise ValueError("Gemini API key not found. Set it in your environment variables.")
+    raise ValueError("Gemini API key not found. Set it in your Render environment variables.")
 
 genai.configure(api_key=GENAI_API_KEY)
 
-# Initialize ChromaDB Client
-PERSIST_DIRECTORY = "/tmp/embeddings"
+# --- Use embeddings folder inside repo ---
+PERSIST_DIRECTORY = os.path.join(os.path.dirname(__file__), "embeddings")
 
 chroma_settings = Settings(
     anonymized_telemetry=False,
@@ -33,13 +33,15 @@ chroma_settings = Settings(
 
 chroma_client = chromadb.PersistentClient(path=PERSIST_DIRECTORY, settings=chroma_settings)
 
+huggingface_model_path = os.path.join(os.path.dirname(__file__), "hugging_face")
+
 vector_db = Chroma(
     client=chroma_client,
     collection_name="hr_faqs",
-    embedding_function=HuggingFaceEmbeddings(model_name="huggingface_model_path")
+    embedding_function=HuggingFaceEmbeddings(model_name=huggingface_model_path)
 )
 
-# Feedback and analytics storage
+# Feedback & analytics storage
 feedback_data = []
 analytics_data = {
     'total_queries': 0,
@@ -51,15 +53,12 @@ analytics_data = {
 
 @app.before_request
 def check_session_age():
-    """
-    Check the session timestamp and reset if it's too old.
-    """
+    """Reset session if inactive for over 1 hour"""
     last_active = session.get('last_active')
     if last_active:
         time_elapsed = datetime.now() - datetime.fromisoformat(last_active)
-        if time_elapsed.total_seconds() > 3600:  # 1 hour
+        if time_elapsed.total_seconds() > 3600:
             session.pop('conversation_history', None)
-
     session['last_active'] = datetime.now().isoformat()
 
 @app.route('/')
@@ -68,49 +67,40 @@ def index():
 
 @app.route('/query', methods=['POST'])
 def chat():
-    # Clear the session history to ensure independent interaction
     session.pop('conversation_history', None)
     session['conversation_history'] = []
 
     data = request.get_json()
     user_query = data.get('query')
-
     if not user_query:
         return jsonify({"error": "Query is required"}), 400
 
     try:
-        # Add user query to a fresh "conversation history"
         session['conversation_history'].append(f"User: {user_query}")
 
-        # Perform knowledge base search
         results = vector_db.similarity_search(user_query, k=3)
-        kb_context = "\n".join([result.page_content for result in results]) if results else "No relevant knowledge found."
+        kb_context = "\n".join([r.page_content for r in results]) if results else "No relevant knowledge found."
 
-        # Generate response with a focus on the current query
         prompt = f"""
-                    You are a highly intelligent and helpful HR assistant.
-                    Provide answers based on the provided knowledge base context.
+        You are a highly intelligent and helpful HR assistant.
+        Provide answers based on the provided knowledge base context.
 
-                    Knowledge Base Context:
-                    {kb_context}
+        Knowledge Base Context:
+        {kb_context}
 
-                    Current Question:
-                    User: {user_query}
+        Current Question:
+        User: {user_query}
 
-                    Your answer should be direct, accurate, and conversational.
-                """
+        Your answer should be direct, accurate, and conversational.
+        """
 
         model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content(prompt)
         bot_response = response.text
 
-        # Append the bot's response to the conversation history
         session['conversation_history'].append(f"Bot: {bot_response}")
 
-        return jsonify({
-            "response": bot_response,
-            "knowledge_matched": bool(results)
-        })
+        return jsonify({"response": bot_response, "knowledge_matched": bool(results)})
 
     except Exception as e:
         app.logger.error(f"Error: {e}")
@@ -119,7 +109,7 @@ def chat():
 @app.route('/feedback', methods=['POST'])
 def submit_feedback():
     data = request.get_json()
-    feedback_type = data.get('feedback_type')  
+    feedback_type = data.get('feedback_type')
     feedback_comment = data.get('comment', '')
 
     if not feedback_type:
@@ -160,9 +150,6 @@ def get_analytics():
 
 @app.route('/clear', methods=['POST'])
 def clear_session():
-    """
-    Endpoint to clear the conversation history.
-    """
     session.pop('conversation_history', None)
     return jsonify({"message": "Conversation history cleared."})
 
