@@ -6,5 +6,4 @@ langchainhub
 google-generativeai
 python-dotenv
 gunicorn
-os
-jsonify
+
