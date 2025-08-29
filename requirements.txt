@@ -6,4 +6,4 @@ langchainhub
 google-generativeai
 python-dotenv
 gunicorn
-
+langchain_chroma
