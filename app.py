@@ -28,7 +28,7 @@ if not GENAI_API_KEY:
 genai.configure(api_key=GENAI_API_KEY)
 
 # --- Initialize ChromaDB Client ---
-PERSIST_DIRECTORY = r"D:\hr-assistant-chatbot\embeddings"
+PERSIST_DIRECTORY = r"embeddings"
 
 chroma_settings = Settings(
     anonymized_telemetry=False,
@@ -41,7 +41,7 @@ chroma_client = chromadb.PersistentClient(path=PERSIST_DIRECTORY, settings=chrom
 vector_db = Chroma(
     client=chroma_client,
     collection_name="hr_faqs",
-    embedding_function=HuggingFaceEmbeddings(model_name=r"D:\hr-assistant-chatbot\hugging_face")
+    embedding_function=HuggingFaceEmbeddings(model_name=r"hugging_face")
 )
 
 # Feedback and analytics storage
