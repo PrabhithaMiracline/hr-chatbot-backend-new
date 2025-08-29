@@ -1,34 +1,29 @@
+import os
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 import chromadb
 from chromadb.config import Settings
-from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
-import logging
-import os
-from dotenv import load_dotenv
+from langchain.chroma import Chroma
+from langchain.embeddings import HuggingFaceEmbeddings
 import google.generativeai as genai
 from datetime import datetime
 
-# --- Configure Logging ---
+# Initialize Flask app
 app = Flask(__name__)
 CORS(app)
-app.logger.setLevel(logging.DEBUG)
 
 # Secret key for session handling
-app.secret_key = 'your_secret_key'
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "your_default_secret_key")
 
 # Load environment variables
-load_dotenv()
-GENAI_API_KEY = os.getenv("API_KEY")
-
+GENAI_API_KEY = os.getenv("GENAI_API_KEY")
 if not GENAI_API_KEY:
-    raise ValueError("Gemini API key not found. Set it in your .env file.")
+    raise ValueError("Gemini API key not found. Set it in your environment variables.")
 
 genai.configure(api_key=GENAI_API_KEY)
 
-# --- Initialize ChromaDB Client ---
-PERSIST_DIRECTORY = r"embeddings"
+# Initialize ChromaDB Client
+PERSIST_DIRECTORY = "/tmp/embeddings"
 
 chroma_settings = Settings(
     anonymized_telemetry=False,
@@ -41,7 +36,7 @@ chroma_client = chromadb.PersistentClient(path=PERSIST_DIRECTORY, settings=chrom
 vector_db = Chroma(
     client=chroma_client,
     collection_name="hr_faqs",
-    embedding_function=HuggingFaceEmbeddings(model_name=r"hugging_face")
+    embedding_function=HuggingFaceEmbeddings(model_name="huggingface_model_path")
 )
 
 # Feedback and analytics storage
@@ -172,4 +167,25 @@ def clear_session():
     return jsonify({"message": "Conversation history cleared."})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    from gunicorn.app.base import BaseApplication
+    from gunicorn.six import iteritems
+
+    class GunicornApp(BaseApplication):
+        def __init__(self, app, options=None):
+            self.options = options or {}
+            self.application = app
+            super().__init__()
+
+        def load(self):
+            return self.application
+
+        def load_config(self):
+            for key, value in iteritems(self.options):
+                if key in self.cfg.settings and value is not None:
+                    self.cfg.set(key.lower(), value)
+
+    options = {
+        'bind': f"0.0.0.0:{os.getenv('PORT', 5000)}",
+        'workers': 2,
+    }
+    GunicornApp(app, options).run()
