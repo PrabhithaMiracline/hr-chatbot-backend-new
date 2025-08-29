@@ -6,4 +6,10 @@ langchainhub
 google-generativeai
 python-dotenv
 gunicorn
-langchain_chroma
+langchain-chroma
+langchain-community
+huggingface-hub
+torch
+transformers
+sentence-transformers
+huggingface-embeddings
