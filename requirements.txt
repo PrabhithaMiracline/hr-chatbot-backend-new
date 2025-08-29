@@ -1,8 +1,8 @@
-Flask
-Flask-Cors
-chromadb
-langchain
-google-generativeai
-python-dotenv
-huggingface-hub
-gunicorn
+Flask==2.3.2
+Flask-Cors==3.1.1
+chromadb==0.3.21
+langchain==0.0.200
+langchainhub==0.0.1
+google-generativeai==0.2.1
+python-dotenv==1.0.0
+gunicorn==20.2.0
