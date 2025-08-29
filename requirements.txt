@@ -11,5 +11,3 @@ langchain-community
 huggingface-hub
 torch
 transformers
-sentence-transformers
-huggingface-embeddings
